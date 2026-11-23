@@ -1,0 +1,24 @@
+# Compiled binaries (leading slash required so internal/server/ is not ignored)
+/server
+/server.exe
+/main
+/main.exe
+/app
+/app.exe
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment & local files
+.env
+coverage.html
+coverage.out
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
