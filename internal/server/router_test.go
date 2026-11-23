@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestNewRouter(t *testing.T) {
@@ -64,4 +66,66 @@ func TestNewRouter(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.Contains(t, w.Body.String(), "Endpoint not found")
 	})
+}
+
+func TestRun(t *testing.T) {
+	origLoad := loadConfigFn
+	origConnect := connectDBFn
+	origMigrate := migrateDBFn
+	origSeed := seedDBFn
+	origListen := listenFn
+	origFatal := fatalFn
+	defer func() {
+		loadConfigFn = origLoad
+		connectDBFn = origConnect
+		migrateDBFn = origMigrate
+		seedDBFn = origSeed
+		listenFn = origListen
+		fatalFn = origFatal
+		gin.SetMode(gin.TestMode)
+	}()
+
+	// Cover default listenFn error path with invalid address
+	assert.Error(t, origListen(gin.New(), "invalid:addr:99999"))
+
+	var lastFatal string
+	fatalFn = func(format string, v ...any) {
+		lastFatal = format
+	}
+
+	loadConfigFn = func() *config.Config {
+		return &config.Config{AppEnv: "production", AppPort: "8081", AppKey: "k"}
+	}
+
+	// Connect error
+	connectDBFn = func(*config.Config) (*gorm.DB, error) { return nil, errors.New("conn err") }
+	Run()
+	assert.Contains(t, lastFatal, "Failed to connect database")
+
+	db, err := database.ConnectTest()
+	require.NoError(t, err)
+	connectDBFn = func(*config.Config) (*gorm.DB, error) { return db, nil }
+
+	// Migrate error
+	migrateDBFn = func(*gorm.DB) error { return errors.New("mig err") }
+	Run()
+	assert.Contains(t, lastFatal, "Failed to migrate database")
+	migrateDBFn = func(*gorm.DB) error { return nil }
+
+	// Seed error
+	seedDBFn = func(*gorm.DB, *config.Config) error { return errors.New("seed err") }
+	Run()
+	assert.Contains(t, lastFatal, "Failed to seed database")
+	seedDBFn = func(*gorm.DB, *config.Config) error { return nil }
+
+	// Listen error
+	listenFn = func(*gin.Engine, string) error { return errors.New("listen err") }
+	Run()
+	assert.Contains(t, lastFatal, "Server stopped with error")
+
+	// Success
+	lastFatal = ""
+	listenFn = func(*gin.Engine, string) error { return nil }
+	Run()
+	assert.Empty(t, lastFatal)
 }
