@@ -20,7 +20,6 @@ type Repository interface {
 	GetStatsByUserID(userID uint) (*PostStatsDTO, error)
 	FindAllUsersWithStats() ([]AdminUserDTO, error)
 	FindAllPosts() ([]database.Post, error)
-	UserExists(userID uint) (bool, error)
 }
 
 type gormRepository struct {
@@ -104,10 +103,14 @@ func (r *gormRepository) GetStatsByUserID(userID uint) (*PostStatsDTO, error) {
 	if err := r.db.Model(&database.Post{}).Where("user_id = ? AND is_published = ?", userID, true).Count(&published).Error; err != nil {
 		return nil, err
 	}
+	draft := total - published
 	return &PostStatsDTO{
-		Total:     total,
-		Published: published,
-		Draft:     total - published,
+		TotalArticles: total,
+		TotalSelesai:  published,
+		BelumSelesai:  draft,
+		Total:         total,
+		Published:     published,
+		Draft:         draft,
 	}, nil
 }
 
@@ -142,12 +145,4 @@ func (r *gormRepository) FindAllPosts() ([]database.Post, error) {
 		return nil, err
 	}
 	return posts, nil
-}
-
-func (r *gormRepository) UserExists(userID uint) (bool, error) {
-	var count int64
-	if err := r.db.Model(&database.User{}).Where("id = ?", userID).Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }

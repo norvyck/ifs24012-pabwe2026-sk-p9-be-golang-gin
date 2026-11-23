@@ -160,21 +160,26 @@ func TestPostFullFlow(t *testing.T) {
 	assert.Equal(t, "belajar-go-gin-2", createResp2.Data.Slug)
 	post2ID := createResp2.Data.ID
 
-	// Public list with search & category
+	// Public list with search & category (must not expose user_id)
 	w = doPostReq(r, http.MethodGet, "/api/public/posts?q=golang&category=Umum", nil, "", "")
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), "user_id")
 
 	// Public detail found & not found
 	w = doPostReq(r, http.MethodGet, "/api/public/posts/belajar-go-gin", nil, "", "")
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), "user_id")
 	w = doPostReq(r, http.MethodGet, "/api/public/posts/tidak-ada", nil, "", "")
 	assert.Equal(t, http.StatusNotFound, w.Code)
 
-	// My posts & stats
+	// My posts & stats (verifies total_articles, total_selesai, belum_selesai)
 	w = doPostReq(r, http.MethodGet, "/api/posts", nil, "2", "member")
 	assert.Equal(t, http.StatusOK, w.Code)
 	w = doPostReq(r, http.MethodGet, "/api/posts/stats", nil, "2", "member")
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "total_articles")
+	assert.Contains(t, w.Body.String(), "total_selesai")
+	assert.Contains(t, w.Body.String(), "belum_selesai")
 
 	// Invalid ID params
 	for _, tc := range []struct{ m, p string }{
@@ -231,7 +236,7 @@ func TestPostFullFlow(t *testing.T) {
 	w = doPostReq(r, http.MethodPatch, "/api/posts/999/toggle-publish", nil, "2", "member")
 	assert.Equal(t, http.StatusNotFound, w.Code)
 
-	// Admin endpoints
+	// Admin endpoints (non-existent user returns 200 with empty list)
 	w = doPostReq(r, http.MethodGet, "/api/admin/users", nil, "1", "admin")
 	assert.Equal(t, http.StatusOK, w.Code)
 	w = doPostReq(r, http.MethodGet, "/api/admin/posts", nil, "1", "admin")
@@ -239,7 +244,7 @@ func TestPostFullFlow(t *testing.T) {
 	w = doPostReq(r, http.MethodGet, "/api/admin/users/2/posts", nil, "1", "admin")
 	assert.Equal(t, http.StatusOK, w.Code)
 	w = doPostReq(r, http.MethodGet, "/api/admin/users/999/posts", nil, "1", "admin")
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 
 	// DeletePost
 	w = doPostReq(r, http.MethodDelete, fmt.Sprintf("/api/posts/%d", post2ID), nil, "3", "member")
@@ -329,10 +334,9 @@ func TestPostErrorPaths(t *testing.T) {
 		_, err = svc.TogglePublish(2, "member", 1)
 		assert.Equal(t, dbErr, err)
 
-		// AdminListUserPosts FindByUserID error when user exists
+		// AdminListUserPosts FindByUserID error
 		svc = NewService(&mockPostRepo{
-			userExistsVal:  true,
-			findByUserErr:  dbErr,
+			findByUserErr: dbErr,
 		})
 		_, err = svc.AdminListUserPosts(2)
 		assert.Equal(t, dbErr, err)
@@ -345,7 +349,6 @@ type mockPostRepo struct {
 	slugCheckErr  error
 	createErr     error
 	updateErr     error
-	userExistsVal bool
 	findByUserErr error
 }
 
@@ -360,4 +363,3 @@ func (m *mockPostRepo) Delete(uint) error                                       
 func (m *mockPostRepo) GetStatsByUserID(uint) (*PostStatsDTO, error)            { return nil, nil }
 func (m *mockPostRepo) FindAllUsersWithStats() ([]AdminUserDTO, error)          { return nil, nil }
 func (m *mockPostRepo) FindAllPosts() ([]database.Post, error)                  { return nil, nil }
-func (m *mockPostRepo) UserExists(uint) (bool, error)                           { return m.userExistsVal, nil }

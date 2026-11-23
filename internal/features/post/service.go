@@ -15,7 +15,6 @@ import (
 var (
 	ErrPostNotFound = errors.New("post not found")
 	ErrForbidden    = errors.New("forbidden: you do not own this post")
-	ErrUserNotFound = errors.New("user not found")
 
 	nonAlphaNumRegex = regexp.MustCompile(`[^a-z0-9]+`)
 )
@@ -51,15 +50,19 @@ func (s *Service) ListCategories() []string {
 	return Categories
 }
 
-func (s *Service) ListPublicPosts(query, category string) ([]PostDTO, error) {
+func (s *Service) ListPublicPosts(query, category string) ([]PublicPostDTO, error) {
 	posts, err := s.repo.FindPublicPosts(query, category)
 	if err != nil {
 		return nil, err
 	}
-	return mapPostsToDTO(posts), nil
+	result := make([]PublicPostDTO, 0, len(posts))
+	for i := range posts {
+		result = append(result, toPublicPostDTO(&posts[i]))
+	}
+	return result, nil
 }
 
-func (s *Service) GetPublicPostBySlug(slug string) (*PostDTO, error) {
+func (s *Service) GetPublicPostBySlug(slug string) (*PublicPostDTO, error) {
 	p, err := s.repo.FindPublicPostBySlug(slug)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -67,7 +70,7 @@ func (s *Service) GetPublicPostBySlug(slug string) (*PostDTO, error) {
 		}
 		return nil, err
 	}
-	dto := toPostDTO(p)
+	dto := toPublicPostDTO(p)
 	return &dto, nil
 }
 
@@ -221,13 +224,6 @@ func (s *Service) AdminListPosts() ([]PostDTO, error) {
 }
 
 func (s *Service) AdminListUserPosts(targetUserID uint) ([]PostDTO, error) {
-	exists, err := s.repo.UserExists(targetUserID)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ErrUserNotFound
-	}
 	posts, err := s.repo.FindByUserID(targetUserID)
 	if err != nil {
 		return nil, err

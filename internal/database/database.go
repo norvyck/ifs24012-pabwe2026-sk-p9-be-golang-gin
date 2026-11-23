@@ -98,12 +98,29 @@ func Seed(db *gorm.DB, cfg *config.Config) error {
 }
 
 func seedUser(db *gorm.DB, username, email, password, role string) error {
-	var count int64
-	if err := db.Model(&User{}).Where("username = ?", username).Count(&count).Error; err != nil {
-		return err
-	}
-	if count > 0 {
+	var existing User
+	err := db.Where("username = ?", username).First(&existing).Error
+	if err == nil {
+		changed := false
+		if existing.Role != role {
+			existing.Role = role
+			changed = true
+		}
+		if role == "admin" && bcrypt.CompareHashAndPassword([]byte(existing.Password), []byte(password)) != nil {
+			hashed, err := hashPassword([]byte(password), bcrypt.DefaultCost)
+			if err != nil {
+				return err
+			}
+			existing.Password = string(hashed)
+			changed = true
+		}
+		if changed {
+			return db.Save(&existing).Error
+		}
 		return nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
 	}
 
 	hashed, err := hashPassword([]byte(password), bcrypt.DefaultCost)

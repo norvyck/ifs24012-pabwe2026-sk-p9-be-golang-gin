@@ -95,6 +95,27 @@ func TestSeed(t *testing.T) {
 	require.NoError(t, db.Model(&User{}).Count(&count).Error)
 	assert.Equal(t, int64(2), count)
 
+	// Promotes existing admin user back to admin role if demoted
+	require.NoError(t, db.Model(&User{}).Where("username = ?", "admin").Update("role", "member").Error)
+	require.NoError(t, Seed(db, cfg))
+	var promoted User
+	require.NoError(t, db.Where("username = ?", "admin").First(&promoted).Error)
+	assert.Equal(t, "admin", promoted.Role)
+
+	// Syncs admin password if changed in config
+	require.NoError(t, Seed(db, &config.Config{AdminUsername: "admin", AdminPassword: "newadminpass"}))
+	require.NoError(t, Seed(db, cfg))
+
+	t.Run("hash error on admin password sync", func(t *testing.T) {
+		origHash := hashPassword
+		defer func() { hashPassword = origHash }()
+		hashPassword = func(password []byte, cost int) ([]byte, error) {
+			return nil, errors.New("sync hash error")
+		}
+		err = Seed(db, &config.Config{AdminUsername: "admin", AdminPassword: "differentpass"})
+		assert.EqualError(t, err, "sync hash error")
+	})
+
 	t.Run("hash error on admin seed", func(t *testing.T) {
 		freshDB, err := ConnectTest()
 		require.NoError(t, err)

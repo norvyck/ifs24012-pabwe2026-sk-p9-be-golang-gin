@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"app/internal/middleware"
 	"app/internal/response"
@@ -28,7 +29,7 @@ func (h *Handler) Register(c *gin.Context) {
 	res, err := h.service.Register(req)
 	if err != nil {
 		if errors.Is(err, ErrUsernameExists) || errors.Is(err, ErrEmailExists) {
-			response.Fail(c, http.StatusConflict, err.Error())
+			response.Fail(c, http.StatusBadRequest, err.Error())
 			return
 		}
 		response.Error(c, http.StatusInternalServerError, "Failed to register user")
@@ -41,7 +42,11 @@ func (h *Handler) Register(c *gin.Context) {
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, "Username and password are required")
+		response.Fail(c, http.StatusBadRequest, "Username or email and password are required")
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" && strings.TrimSpace(req.Email) == "" {
+		response.Fail(c, http.StatusBadRequest, "Username or email and password are required")
 		return
 	}
 
@@ -101,7 +106,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		case errors.Is(err, ErrUserNotFound):
 			response.Fail(c, http.StatusNotFound, err.Error())
 		case errors.Is(err, ErrUsernameExists), errors.Is(err, ErrEmailExists):
-			response.Fail(c, http.StatusConflict, err.Error())
+			response.Fail(c, http.StatusBadRequest, err.Error())
 		default:
 			response.Error(c, http.StatusInternalServerError, "Failed to update profile")
 		}

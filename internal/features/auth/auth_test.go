@@ -88,21 +88,29 @@ func TestAuthFullFlow(t *testing.T) {
 	assert.Equal(t, "alice", regResp.Data.User.Username)
 	token := regResp.Data.Token
 
-	// Duplicate username
+	// Duplicate username (400)
 	w = postJSON(r, http.MethodPost, "/api/auth/register", RegisterRequest{
 		Username: "alice",
 		Email:    "other@example.com",
 		Password: "password123",
 	}, "")
-	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-	// Duplicate email
+	// Duplicate email (400)
 	w = postJSON(r, http.MethodPost, "/api/auth/register", RegisterRequest{
 		Username: "bob",
 		Email:    "alice@example.com",
 		Password: "password123",
 	}, "")
-	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// Short password rejected (400)
+	w = postJSON(r, http.MethodPost, "/api/auth/register", RegisterRequest{
+		Username: "shortpw",
+		Email:    "short@example.com",
+		Password: "12345",
+	}, "")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	// Register user 2 for conflict tests on update
 	w = postJSON(r, http.MethodPost, "/api/auth/register", RegisterRequest{
@@ -112,8 +120,10 @@ func TestAuthFullFlow(t *testing.T) {
 	}, "")
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	// Login bad payload
+	// Login bad payload (missing password, missing identifier)
 	w = postJSON(r, http.MethodPost, "/api/auth/login", `{}`, "")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	w = postJSON(r, http.MethodPost, "/api/auth/login", LoginRequest{Password: "password123"}, "")
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	// Login unknown user
@@ -130,9 +140,21 @@ func TestAuthFullFlow(t *testing.T) {
 	}, "")
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-	// Login success
+	// Login success with username
 	w = postJSON(r, http.MethodPost, "/api/auth/login", LoginRequest{
 		Username: "alice",
+		Password: "password123",
+	}, "")
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Login success with email in username field and in email field
+	w = postJSON(r, http.MethodPost, "/api/auth/login", LoginRequest{
+		Username: "alice@example.com",
+		Password: "password123",
+	}, "")
+	assert.Equal(t, http.StatusOK, w.Code)
+	w = postJSON(r, http.MethodPost, "/api/auth/login", LoginRequest{
+		Email:    "alice@example.com",
 		Password: "password123",
 	}, "")
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -151,17 +173,19 @@ func TestAuthFullFlow(t *testing.T) {
 	w = postJSON(r, http.MethodPut, "/api/auth/profile-unauth", UpdateProfileRequest{}, "")
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-	// Update profile invalid JSON
+	// Update profile invalid JSON & invalid email
 	w = postJSON(r, http.MethodPut, "/api/auth/profile", "{invalid", token)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Email: "not-an-email"}, token)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-	// Update profile duplicate username
+	// Update profile duplicate username (400)
 	w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Username: "bob"}, token)
-	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-	// Update profile duplicate email
+	// Update profile duplicate email (400)
 	w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Email: "bob@example.com"}, token)
-	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	// Update profile success (username, email, password)
 	w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{
@@ -188,7 +212,7 @@ func TestAuthServiceAndHandlerErrorPaths(t *testing.T) {
 		w := postJSON(r, http.MethodGet, "/api/auth/profile", nil, ghostToken)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
-		w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Username: "x"}, ghostToken)
+		w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Username: "newname"}, ghostToken)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 
@@ -274,19 +298,27 @@ func TestAuthServiceAndHandlerErrorPaths(t *testing.T) {
 		w = postJSON(r, http.MethodGet, "/api/auth/profile", nil, tok)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
-		w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Username: "y"}, tok)
+		w = postJSON(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{Username: "validname"}, tok)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("granular repo errors in service", func(t *testing.T) {
 		dbErr := errors.New("db error")
 
+		// Login FindByEmail error when FindByUsername returns not found
+		svcEmailErr := NewService(&mockAuthRepo{
+			findByUsernameNotFound: true,
+			findByEmailErr:         dbErr,
+		}, "secret")
+		_, err := svcEmailErr.Login(LoginRequest{Username: "x@y.com", Password: "password123"})
+		assert.Equal(t, dbErr, err)
+
 		// Register FindByEmail error
 		svc := NewService(&mockAuthRepo{
 			findByUsernameNotFound: true,
 			findByEmailErr:         dbErr,
 		}, "secret")
-		_, err := svc.Register(RegisterRequest{Username: "u", Email: "u@e.com", Password: "pw"})
+		_, err = svc.Register(RegisterRequest{Username: "u", Email: "u@e.com", Password: "pw"})
 		assert.Equal(t, dbErr, err)
 
 		// Register Create error

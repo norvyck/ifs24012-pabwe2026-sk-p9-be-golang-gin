@@ -81,13 +81,23 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 }
 
 func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
-	username := strings.TrimSpace(req.Username)
-	user, err := s.repo.FindByUsername(username)
+	identifier := strings.TrimSpace(req.Username)
+	if identifier == "" {
+		identifier = strings.TrimSpace(req.Email)
+	}
+
+	user, err := s.repo.FindByUsername(identifier)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrInvalidCredentials
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
 		}
-		return nil, err
+		user, err = s.repo.FindByEmail(strings.ToLower(identifier))
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, ErrInvalidCredentials
+			}
+			return nil, err
+		}
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {

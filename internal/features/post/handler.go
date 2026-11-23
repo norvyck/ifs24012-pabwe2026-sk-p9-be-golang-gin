@@ -205,10 +205,6 @@ func (h *Handler) AdminListUserPosts(c *gin.Context) {
 
 	posts, err := h.service.AdminListUserPosts(id)
 	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			response.Fail(c, http.StatusNotFound, err.Error())
-			return
-		}
 		response.Error(c, http.StatusInternalServerError, "Failed to load user posts")
 		return
 	}
