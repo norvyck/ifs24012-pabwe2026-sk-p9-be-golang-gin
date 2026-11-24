@@ -120,6 +120,21 @@ func TestAuthFullFlow(t *testing.T) {
 	}, "")
 	require.Equal(t, http.StatusCreated, w.Code)
 
+	// Register admin user when role is specified
+	w = postJSON(r, http.MethodPost, "/api/auth/register", RegisterRequest{
+		Username: "newadmin",
+		Email:    "newadmin@example.com",
+		Password: "password123",
+		Role:     "admin",
+	}, "")
+	require.Equal(t, http.StatusCreated, w.Code)
+	var adminRegResp struct {
+		Status string       `json:"status"`
+		Data   AuthResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &adminRegResp))
+	assert.Equal(t, "admin", adminRegResp.Data.User.Role)
+
 	// Login bad payload (missing password, missing identifier)
 	w = postJSON(r, http.MethodPost, "/api/auth/login", `{}`, "")
 	assert.Equal(t, http.StatusBadRequest, w.Code)

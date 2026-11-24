@@ -160,15 +160,17 @@ func TestPostFullFlow(t *testing.T) {
 	assert.Equal(t, "belajar-go-gin-2", createResp2.Data.Slug)
 	post2ID := createResp2.Data.ID
 
-	// Public list with search & category (must not expose user_id)
+	// Public list with search & category (must not expose user_id, must include author_name)
 	w = doPostReq(r, http.MethodGet, "/api/public/posts?q=golang&category=Umum", nil, "", "")
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NotContains(t, w.Body.String(), "user_id")
+	assert.Contains(t, w.Body.String(), `"author_name":"author1"`)
 
 	// Public detail found & not found
 	w = doPostReq(r, http.MethodGet, "/api/public/posts/belajar-go-gin", nil, "", "")
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NotContains(t, w.Body.String(), "user_id")
+	assert.Contains(t, w.Body.String(), `"author_name":"author1"`)
 	w = doPostReq(r, http.MethodGet, "/api/public/posts/tidak-ada", nil, "", "")
 	assert.Equal(t, http.StatusNotFound, w.Code)
 

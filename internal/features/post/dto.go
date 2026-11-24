@@ -42,6 +42,7 @@ type AuthorInfo struct {
 
 type PublicPostDTO struct {
 	ID             uint        `json:"id"`
+	AuthorName     string      `json:"author_name"`
 	Author         *AuthorInfo `json:"author,omitempty"`
 	Title          string      `json:"title"`
 	Slug           string      `json:"slug"`
@@ -59,6 +60,7 @@ type PublicPostDTO struct {
 type PostDTO struct {
 	ID             uint        `json:"id"`
 	UserID         uint        `json:"user_id"`
+	AuthorName     string      `json:"author_name"`
 	Author         *AuthorInfo `json:"author,omitempty"`
 	Title          string      `json:"title"`
 	Slug           string      `json:"slug"`
@@ -87,6 +89,9 @@ type AdminUserDTO struct {
 	Username       string    `json:"username"`
 	Email          string    `json:"email"`
 	Role           string    `json:"role"`
+	TotalArticles  int64     `json:"total_articles"`
+	TotalSelesai   int64     `json:"total_selesai"`
+	BelumSelesai   int64     `json:"belum_selesai"`
 	TotalPosts     int64     `json:"total_posts"`
 	PublishedPosts int64     `json:"published_posts"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -95,6 +100,7 @@ type AdminUserDTO struct {
 func toPublicPostDTO(p *database.Post) PublicPostDTO {
 	dto := PublicPostDTO{
 		ID:             p.ID,
+		AuthorName:     p.User.Username,
 		Title:          p.Title,
 		Slug:           p.Slug,
 		Category:       p.Category,
@@ -120,6 +126,7 @@ func toPostDTO(p *database.Post) PostDTO {
 	dto := PostDTO{
 		ID:             p.ID,
 		UserID:         p.UserID,
+		AuthorName:     p.User.Username,
 		Title:          p.Title,
 		Slug:           p.Slug,
 		Category:       p.Category,
