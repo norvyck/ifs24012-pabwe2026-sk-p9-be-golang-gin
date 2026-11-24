@@ -85,16 +85,19 @@ type PostStatsDTO struct {
 }
 
 type AdminUserDTO struct {
-	ID             uint      `json:"id"`
-	Username       string    `json:"username"`
-	Email          string    `json:"email"`
-	Role           string    `json:"role"`
-	TotalArticles  int64     `json:"total_articles"`
-	TotalSelesai   int64     `json:"total_selesai"`
-	BelumSelesai   int64     `json:"belum_selesai"`
-	TotalPosts     int64     `json:"total_posts"`
-	PublishedPosts int64     `json:"published_posts"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID                uint      `json:"id"`
+	Username          string    `json:"username"`
+	Email             string    `json:"email"`
+	Role              string    `json:"role"`
+	TotalArticles     int64     `json:"total_articles"`
+	TotalPublished    int64     `json:"total_published"`
+	PublishedArticles int64     `json:"published_articles"`
+	PublishedCount    int64     `json:"published_count"`
+	TotalSelesai      int64     `json:"total_selesai"`
+	BelumSelesai      int64     `json:"belum_selesai"`
+	TotalPosts        int64     `json:"total_posts"`
+	PublishedPosts    int64     `json:"published_posts"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 func toPublicPostDTO(p *database.Post) PublicPostDTO {

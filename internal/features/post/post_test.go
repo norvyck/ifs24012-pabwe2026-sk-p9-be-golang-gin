@@ -241,6 +241,8 @@ func TestPostFullFlow(t *testing.T) {
 	// Admin endpoints (non-existent user returns 200 with empty list)
 	w = doPostReq(r, http.MethodGet, "/api/admin/users", nil, "1", "admin")
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "total_published")
+	assert.Contains(t, w.Body.String(), "published_articles")
 	w = doPostReq(r, http.MethodGet, "/api/admin/posts", nil, "1", "admin")
 	assert.Equal(t, http.StatusOK, w.Code)
 	w = doPostReq(r, http.MethodGet, "/api/admin/users/2/posts", nil, "1", "admin")

@@ -127,16 +127,19 @@ func (r *gormRepository) FindAllUsersWithStats() ([]AdminUserDTO, error) {
 			return nil, err
 		}
 		result = append(result, AdminUserDTO{
-			ID:             u.ID,
-			Username:       u.Username,
-			Email:          u.Email,
-			Role:           u.Role,
-			TotalArticles:  stats.TotalArticles,
-			TotalSelesai:   stats.TotalSelesai,
-			BelumSelesai:   stats.BelumSelesai,
-			TotalPosts:     stats.Total,
-			PublishedPosts: stats.Published,
-			CreatedAt:      u.CreatedAt,
+			ID:                u.ID,
+			Username:          u.Username,
+			Email:             u.Email,
+			Role:              u.Role,
+			TotalArticles:     stats.TotalArticles,
+			TotalPublished:    stats.Published,
+			PublishedArticles: stats.Published,
+			PublishedCount:    stats.Published,
+			TotalSelesai:      stats.TotalSelesai,
+			BelumSelesai:      stats.BelumSelesai,
+			TotalPosts:        stats.Total,
+			PublishedPosts:    stats.Published,
+			CreatedAt:         u.CreatedAt,
 		})
 	}
 	return result, nil
